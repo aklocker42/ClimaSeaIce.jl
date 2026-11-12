@@ -48,7 +48,8 @@ extended_external_variable(src, grid) = src
 
 function extended_external_variable(src::Field, grid)
     grids_match(src, grid) && return src
-    field = Field{Oceananigans.location(src)...}(grid; boundary_conditions = src.boundary_conditions)
+    # Default boundary conditions: the source's (e.g. discrete-form open boundaries) may need a clock and model fields
+    field = Field{Oceananigans.location(src)...}(grid)
     interior(field) .= interior(src)
     return field
 end
@@ -59,6 +60,8 @@ function refresh_and_fill_external_field!(dst::Field, src)
     fill_halo_regions!(dst)
     return nothing
 end
+
+refresh_and_fill_external_field!(::ZeroField, ::ZeroField) = nothing
 
 materialize_stress(stress, grid) = extended_external_variable(stress, grid)
 
@@ -90,6 +93,9 @@ function materialize_free_surface(η₀, gravitational_acceleration, grid)
 end
 
 extended_surface_height(η₀, grid) = η₀
+
+# An integer `ZeroField` makes the free-surface tilt a `Union{Int, Float}` inside kernels
+extended_surface_height(::ZeroField, grid) = ZeroField(eltype(grid))
 
 function extended_surface_height(η₀::Field, grid)
     Oceananigans.location(η₀) === (Center, Center, Nothing) && grids_match(η₀, grid) && return η₀
